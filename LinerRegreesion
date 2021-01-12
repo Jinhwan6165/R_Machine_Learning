@@ -1,0 +1,57 @@
+###선형회귀분석 (중고차판매_예측)
+
+
+library(tidyverse)
+getwd()
+
+##절대 경로 
+setwd()
+
+##상대 경로
+##setwd(dir='./rMLearning')
+getwd()
+list.files()
+
+df <- read.csv(file='https://bit.ly/used_cars_price')
+
+#데이터 프레임을 가져왔으면 Structure를 확인
+
+str(object = df)
+
+#Age: 개월수
+#KM:주행거리
+#FuelType: Diesel, Petrol, CNG ->범주형
+#HP:마력 <= 120
+#MetColor:금속컬러->범주형
+#Automatic:미션-> 범주형
+#CC:엔진크기  
+#Doors:문의 개수>=3
+#Weight:차량의 무게 >= 1200
+
+##EDA를 먼저 해야 한다.
+
+df<-df %>%
+  filter(HP<=120 & Weight <=1200 & Doors>=3)
+
+df<-df%>%select(-CC)
+
+#CNG이 데이터 (샘플데이터)가 작아서 모형을 만드는 것이 좋지 않아서 제거
+
+
+table(df$FuelType) # table()빈도수를 보여줌
+
+
+df<-df%>%
+  filter(FuelType %in% c('Diesel','Petrol'))%>%
+  mutate(FuelType = factor(x=FuelType),
+         Automatic = factor(x=Automatic),
+         MetColor = factor(x=MetColor))
+
+str(object = df)
+
+summary(object=df)
+
+#정규분포 확인하는 법 
+shapiro.test(x=df$Price)
+
+#1:45:16
