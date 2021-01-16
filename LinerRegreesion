@@ -38,7 +38,7 @@ df<-df%>%select(-CC)
 #CNG이 데이터 (샘플데이터)가 작아서 모형을 만드는 것이 좋지 않아서 제거
 
 
-table(df$FuelType) # table()빈도수를 보여줌
+table(df$FuelType) # table() 빈도수를 보여줌
 
 
 df<-df%>%
@@ -51,7 +51,7 @@ str(object = df)
 
 summary(object=df)
 
-#정규분포 확인하는 법 
+#정규분포 확인하는 법 (사피로 테스트)
 shapiro.test(x=df$Price)
 
 #1:45:16
