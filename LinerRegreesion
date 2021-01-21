@@ -54,6 +54,60 @@ summary(object=df)
 #정규분포 확인하는 법 (사피로 테스트)
 shapiro.test(x=df$Price)
 
-#1:45:16
+#분석 데이터셋 분할
+# 전체 데이터 70%를 훈련용, 30%를 시험용 데이터로 분리
+
+ n <-nrow(x=df)
+print(n)
+
+set.seed(seed=1234) #seed의 숫자는 의미가 있는 것은 아니다.
+
+index<-sample(x=n, size=n*0.7, replace=FALSE)  # n=공의 개수 , size=뽑을 개수, replace= 복원(T)/비복원(F), index=행번호
+print(x=index)
+
+trainSet <-df%>%slice(index)
+testSet <-df%>%slice(-index)
+
+mean(x=trainSet$Price)
+mean(x=testSet$Price)
+
+# R에서 선형 회귀모형을 적합할 때 lm() 함수를 사용한다.
+##formula : 목표변수와 입력변수 간 관계를 표현함
+## data: 로지스틱 회귀모형에 사용될 훈련셋 할당
+
+# 목표변수와 입력변수의 관계를 설졍하는 다양한 방식
+##>lm(formula=Price~Age, data=trainSet)  입력변수를 한개 만 설정
+##>lm(formula=Price~Age+KM, data=trainSet) 입력변수를 두 개 이상 설정할 때는 입력변수 사이에 '+' 기호를 추가
+##>lm(formula=Price~,, data=trainSet)    trainSet에서 목표변수를 제외한 나머지 변수를 입력변수로 설정하고 싶은 경우, 온점(.)만 추가
+###full모형 : 입력변수가 모두 쓰였으므로
+##>lm(formula=Price~ 1, data=trainSet)  입력변수 하나도 없이 y절편만 설정하려면 숫자 1만 추가
+### null모형 :입력변수가 하나오 없으므로
+
+fit <- lm(formula = Price ~Age, data=trainSet)
+summary(object=fit)
+
+# 1) 최소 자승법으로 회귀 계수 추청 (Estimate )
+# 2)회귀모형의 유의성 검정 : 모형(=p-value, f통게량=검정통게량을 따르는 아노바,유의 확률은 0이므로 귀무가설 기각 베타가 모두 0이다-->
+#   유의성 검정 통과) --> 계수(t value Pr(>|t|), p벨류가 0이므로, 베타1이 0이라는 귀무가설은 기각한다. 따라서 0이 아니다.)
+#   즉,'Age라는 변수가 증가할 때마다 -155.289만큼 가격이 빠진다'는 의미가 있다.
+# 3) 결정계수 확인: 입력변수가 1개일 떄 Muliple R-squard 확인하고 2개 이상인 경우 Adjusted 항목 확인
+#   입력변수가 1개 쓰인 R^2의 경우, 두 변수간 피어슨 상관계수의 제곱이 된다.
+### 통게적으로 얼마나 유의한지를 보는 것이 데이터 마이닝에서 중요하다.
+
+par(mfrow = c(2,2)) #plot창의 환경을 설정해줌. 원복할 경우 par(mfrow = c(1,1))로 바꿔준다.
+plot(x=fit)
+par(mfrow=c(1,1))
+
+hist(x=fit$residuals)
+shapiro.test(x=fit$residuals)  #p벨류가 1이면 귀무가설(정규분포한다)기각한다. 잔차가 정규분포 하지 않는다.
+
+#install.packages("devtools")
+#install.packages("car")
+
+library(car)
+ncvTest(model=fit)  #유의확률 0 귀무가설(등분산한다) 기각 등분산 과적 불만족
+durbinWatsonTest(model=fit) # 귀무가설(자기상관계수는 0이다,상관관게가 없다) 기각하지 못한다. Alternative ~: 자기 상관게수가 0이 아니다 
+crPlots(model=fit) #핑크색 선이 파란색 점선과 일치 해야 함. 위부분은 별도의 그래프를 만들면 좋을 정도로 그래프가 나옴
+influencePlot(model=fit)  #Cook's distance중에 1이상이 있는가 확인
 
 
