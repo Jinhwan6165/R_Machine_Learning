@@ -110,8 +110,13 @@ durbinWatsonTest(model=fit) # 귀무가설(자기상관계수는 0이다,상관�
 crPlots(model=fit) #핑크색 선이 파란색 점선과 일치 해야 함. 위부분은 별도의 그래프를 만들면 좋을 정도로 그래프가 나옴
 influencePlot(model=fit)  #Cook's distance중에 1이상이 있는가 확인
 
-## 2차항 추가
 
+## 회귀 모형에 2차항 추가
+fit2 <- lm(formula =Price ~ Age + I(x=Age^2), data=trainSet)
+summary(object=fit2)
+crPlots(model=fit2)
+vif(mod = fit2)
+# 두 입력변수의 분산팽창지수가 10을 초과하므로 다중공산성 문제가 발생하는 것으로 판단
 
 
 ## 목표변수의 추정값 생성 
@@ -266,7 +271,30 @@ F-statistic: 835.8 on 7 and 952 DF,  p-value: < 2.2e-16
 
 
 summary(fit3) # 귀무가설(이 회귀식에 사용된 모든 입력변수의 회귀계수 = 0) 기각, 따라서 최소 1개는 0이 아니다
-vif(mod=fit3)
+Call:
+lm(formula = Price ~ Age + KM + Weight + FuelType + HP + Doors + 
+    Automatic, data = trainSet)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-5266.4  -759.0   -34.6   646.9  6124.9 
+
+Coefficients:
+                 Estimate Std. Error t value Pr(>|t|)    
+(Intercept)    -1.947e+04  2.173e+03  -8.959  < 2e-16 ***
+Age            -1.136e+02  2.980e+00 -38.117  < 2e-16 ***
+KM             -1.513e-02  1.440e-03 -10.503  < 2e-16 ***
+Weight          3.508e+01  2.097e+00  16.729  < 2e-16 ***
+FuelTypePetrol  3.369e+03  3.116e+02  10.813  < 2e-16 ***
+HP             -2.258e+01  4.853e+00  -4.652 3.75e-06 ***
+Doors          -1.812e+02  4.705e+01  -3.851 0.000125 ***
+Automatic1     -3.363e+02  1.688e+02  -1.993 0.046549 *  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 1151 on 952 degrees of freedom
+Multiple R-squared:  0.8601,	Adjusted R-squared:  0.859 
+F-statistic: 835.8 on 7 and 952 DF,  p-value: < 2.2e-16
 
 > #모든 회귀계수는 0이 아니라고 판단,  그다음 adjusted r-squared 를 확인 입력변수들이 목표변수를 얼마나 설명하는지..(0.859)
 > 
@@ -278,3 +306,57 @@ vif(mod=fit3)
 > # 만약 분산팽창지수가 10을 초과하는 입력변수가 여러개 있을 경우, 분산팽창지수가 자아 큰 입력변수 하나만 훈련셋에서 삭제하고 회귀모형을 다시 적합한다.
 > # 새로 적합한 회귀모형의 분산팽창지수를 확인하고 분산팽창지수가 10을 초과하는 변수가 없을 때까지 위 과정 반복한다.
 
+#표준화 회귀계수 :방향이 아니라 절대값이 중요하다.
+# 숫자가 가장 큰게 Price에 제일 영향을 많이 줄까? 척도가 다 다르기 때문에 1:1로 입력변수들을 비교할 수 없다.
+# 어떤 입력변수가 목표변수에 영향을 주는지 알기 위해서 표준화 회귀계수를 실행
+
+###install.packages("reghelper")
+library(reghelper)
+beta(model=fit3)
+
+> beta(model=fit3)
+
+Call:
+lm(formula = "Price.z ~ Age.z + KM.z + Weight.z + FuelTypePetrol.z + HP.z + Doors.z + Automatic1.z", 
+    data = data)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-1.71844 -0.24766 -0.01128  0.21109  1.99856 
+
+Coefficients:
+                   Estimate Std. Error t value Pr(>|t|)    
+(Intercept)       6.886e-18  1.212e-02   0.000 1.000000    
+Age.z            -6.444e-01  1.691e-02 -38.117  < 2e-16 ***
+KM.z             -1.789e-01  1.704e-02 -10.503  < 2e-16 ***
+Weight.z          3.988e-01  2.384e-02  16.729  < 2e-16 ***
+FuelTypePetrol.z  2.987e-01  2.763e-02  10.813  < 2e-16 ***
+HP.z             -9.284e-02  1.996e-02  -4.652 3.75e-06 ***
+Doors.z          -5.617e-02  1.458e-02  -3.851 0.000125 ***
+Automatic1.z     -2.616e-02  1.313e-02  -1.993 0.046549 *  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Residual standard error: 0.3755 on 952 degrees of freedom
+Multiple R-squared:  0.8601,	Adjusted R-squared:  0.859 
+F-statistic: 835.8 on 7 and 952 DF,  p-value: < 2.2e-16
+
+> beta.z<-beta(model=fit3) 
+> beta.z$coefficients[,1] # 행렬이므로 첫번째 컬럼만 가져와야 한다. 벡터로 표준화 회귀계수를 가져온다.
+     (Intercept)            Age.z             KM.z         Weight.z FuelTypePetrol.z             HP.z          Doors.z     Automatic1.z 
+    6.885978e-18    -6.443675e-01    -1.789492e-01     3.988369e-01     2.987439e-01    -9.284145e-02    -5.616607e-02    -2.616063e-02 
+> round(x=beta.z$coefficients[,1], digits = 4)  # 한눈에 알아보기 어려우므로 반올림 처리
+     (Intercept)            Age.z             KM.z         Weight.z FuelTypePetrol.z             HP.z          Doors.z     Automatic1.z 
+          0.0000          -0.6444          -0.1789           0.3988           0.2987          -0.0928          -0.0562          -0.0262 
+# 표준화 회귀계수는 방향이 아니라 절대값이 중요하다. 연식> 무게> 연료형태>주행거리
+# 분석보고서 제출시에 표준화 회귀계수를 구하여 어떤 요소가 영향을 주는지 설명해야한다.
+
+pred2 <- predict(object= fit3, newdata=testSet)
+print(x=pred2)  #named vector라고 한다 412행의 값이 7508.588
+
+# 성능평가
+
+RMSE(y_pred = pred1, y_true = real)
+RMSE(y_pred = pred2, y_true = real) # 이 중 0에 더 가까운 것은 pred2이다.
+
+##Price에 더 높은 성능을 보이는 유형은 fit3이다 입력변수가 여러개 쓰인 것이다. fit3를 최종모형으로 선택
