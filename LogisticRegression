@@ -1,0 +1,188 @@
+library(tidyverse)
+
+#인코딩 확인 : guess_encoding(file=url)
+# read.csv(file=url, fileEncoding='utf-8')
+
+url <- 'https://bit.ly/university_admit'
+guess_encoding(file=url)
+#guess_encoding(file= 'https://www.naver.com')
+#guess_encoding(file= 'https://finance.naver.com')
+
+df<-read.csv(file=url)
+str(object=df)
+
+#str()함수를 실행하는 이유 : 컬럼별 벡터 자료형을 확인하기 위함.
+
+head(x=df, n=10L) # L을 붙이는 이유는 정수로 만들기 위함. 생략 가능
+
+# summary()함수를 실행하는 이유: 컬럼별 기술 통계량을 빠르게 확인하기 위함
+summary(object=df)
+
+#admit과 rank 컬럼 범주형으로 변형
+
+#df$admit <- as.factor(x=df$admit)
+#df$admit <- as.factor(x=df$rank)
+
+#amp_df() : 데이터 형태 바꾸기 (여러개)
+vars <- c('admit','rank')
+df[vars] <- map_df(.x=df[vars], .f=as.factor)
+summary(object=df)
+
+#  prop.table(x=table(df$admit))*100  . 아래 파이프 라인 함수와 동일
+# 파이프라인 연산자: shift & ctrl & m
+# df$admit %>% table()%>% prop.table()*100
+
+df$admit %>% table() %>% prop.table()*100
+
+boxplot(formula=gre ~ admit,
+        data=df,
+        col='white',
+        pch=19,
+        outcol='red')
+
+#t-test 그룹간 평균이 같은가를 확인 직선값은 중위수 이므로 평균을 계산해야 함
+
+avg<- df%>% group_by(admit) %>% summarise(m=mean(x=gre))
+
+# ggplot이 아닌 함수로 평균값 찍기
+points(formula=m ~ admit,
+       data=avg,
+       pch=19,
+       col='blue',
+       cex=1.2)
+
+# 불합격자와 합격자의 평균이 같은가? --> 차이가 있다. --> t-test진행
+
+
+by(data=df$gre, INDICES = df$admit, FUN=shapiro.test)
+#p-value가 0.05보다 작으면 귀무가설(정규분포한다) 기각 --> t.test 사용 불가
+# 비모수적 기법인 wilcox 기법을 사용
+
+wilcox.test(formula = gre~ admit, data=df)
+
+# 귀무가설(그룹별로 GRE의 중위수가 같은 위치에 있지 않다.) 기각. 
+# 대립가설 채택 --> 0아니라 차이가 있다. 즉, 합격자와 불합격자고 GRE가 다르다
+
+boxplot(formula=gpa ~ admit,
+        data=df,
+        col='white',
+        pch=19,
+        outcol='red')
+
+avg<- df%>% group_by(admit) %>% summarise(m=mean(x=gpa))
+
+points(formula=m ~ admit,
+       data=avg,
+       pch=19,
+       col='blue',
+       cex=1.2)
+# GPA의 평균이 시각적으로는 차이가 있어 보인다. 통계적확인
+
+by(data=df$gpa, INDICES = df$admit, FUN=shapiro.test)
+# 정규분포하지 않는다.
+
+wilcox.test(formula = gpa~ admit, data=df)
+# 귀무가설 기각.  즉, 합격자와 불합격자의 GPA는 차이가 있다.
+
+library(gmodels)
+CrossTable(x=df$rank, y=df$admit)
+
+# N: 빈도수 
+# 카이제곱 통계량 
+#빈도수를 행total로 나눈값 
+#열total로 나눈값 전체값으로 나눈값
+
+# rank와 admit은 관계가 있다. 관계가 없으면  카이제곱 통계량은 0으로 수렴한다.
+
+chisq.test(x=df$rank, y=df$admit)
+
+#귀무가설(두변수끼리 관계가 없다) 기각, 학교 등급과 합격은 관계가 있고 
+# 독립이 아니다.
+
+###데이터 셋 분할
+n <- nrow(x=df)
+set.seed(seed=1234)
+index <- sample( x=n, size=n*0.7, replace = FALSE)
+trainSet <- df %>% slice(index)
+testSet <- df %>% slice(-index)
+
+trainSet$admit %>% table() %>% prop.table()*100
+testSet$admit %>% table() %>% prop.table()*100
+
+# 목표변수가 정규 분포=lm, 정규분포 X = glm
+fit1 <- glm(formula = admit ~ ., 
+            data=trainSet, 
+            family=binomial(link='logit'))  # 목표변수의 분포 : family()
+summary(object=fit1)
+
+#선형회귀 모형의 경우, F통계량의 p-value 확인. (회귀모형의 유의성 검정)
+# glm의 경우, 없으므로 Null deviance(목표변수가 사용되지 않은 이탈도 & Residual~(목표변수가 사용된 이탈도) 확인
+# 결과만 보면 베타가 0으로 보여지므로 귀무가설을 기각 X,  (데이터를 더 모으거나 해야함...)
+# rank2~4는 더미 변수(기준값대비 다른 값들이 평균저으로 빠지는 가를 보여줌)이다.
+
+fit1$coefficients %>% exp() %>% round(digits=4L)
+
+#스케일이 다르므로 아직 비교 불가하다 표준화가 필요
+
+
+library(reghelper)
+beta.z <- beta(model=fit1)
+beta.z$coefficients[,1] %>% round(digit=4L)
+
+# 입학에 가장 영향을 많이 주는 것은 학점이다.
+
+real <- testSet$admit
+print(x=real)
+
+prob1<- predict(object = fit1, newdata = testSet, type = 'response')
+print(x=prob1)
+
+pred1 <- ifelse(test=prob1 >= 0.5, yes = 1, no = 0) %>% as.factor()
+print(x=pred1)
+
+install.packages("caret")
+install.packages("e1071")
+
+library(caret)
+
+confusionMatrix(data = pred1, reference = real, positive = '1')
+
+# F1점수 출력
+
+library(MLmetrics)
+
+F1_Score(y_true = real,
+         y_pred = pred1,
+         positive = '1')
+
+# ROC 곡선 : 추정확률을 넣어아지 추정라벨로 그리면 한점만 찍어서 직선으로 그려진다
+# 2번째 함수로 그린 그림 확인
+
+library(pROC)
+
+roc(response = real, predictor = prob1) %>% 
+  plot(main = 'ROC Curve', col='red', lty=1)
+
+roc(response = real, predictor = as.numeric(x=pred1)) %>% 
+  plot(col='blue', lty=1, lwd=2, add=TRUE)
+
+# main :  제목, col: 선의 색, lty: 라인타입 (1=직선, 2=곡선) lwd :라인 두께
+
+auc(response = real, predictor = prob1) 
+#auc의 경우 0~1사이에 존재하는 값인데, 0.5보다는 커야한다. 작으면 좋지 않은 모형이다.
+
+# 분리기준점을 0.5로 정하는 것이 안좋을 수 있다. 어느 한쪽으로 쏠려이는 데이터를 분석할 때,
+#표본균형화: 0:1=5:5 샘플을 데이터 밸런싱 해주어야 한다. 
+
+rate <- trainSet$admit %>% table() %>% prop.table()
+rate[2]
+
+pred2 <- ifelse(test=prob1 >= rate[2], yes = 1, no = 0) %>% as.factor()
+print(x=pred2)
+
+confusionMatrix(data=pred1, reference = real, positive = '1')
+confusionMatrix(data=pred2, reference = real, positive = '1')
+
+F1_Score(y_true = real, y_pred = pred1, positive = '1')
+F1_Score(y_true = real, y_pred = pred2, positive = '1')
+
