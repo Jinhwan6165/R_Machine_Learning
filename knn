@@ -1,0 +1,210 @@
+library(tidyverse)
+
+getwd()
+#setwd(dir='C:\Users\pomel\OneDrive\바탕 화면\NANO\rMLearning')
+list.files()
+cust <- readRDS(file = 'Dataset for Cust.RDS')
+
+str(object=cust)
+
+
+# dist : 각각의 요소의 거리를 계산해 주는 함수
+dist(x=cust)
+
+#scale : 데이터 표준화 함수
+scaled <- scale(x=cust)
+summary(object = scaled) # 대표적인 기술통계량을 확인
+apply(X=scaled, MARGIN = 2, FUN = sd) # 표준편차 확인(평균이 0,표준편차 1)
+
+dist(x=scaled)
+
+# 데이터 분석시, 정규분포를 따른다면/ 척도가 다르다면 무조건 해줘야한다.
+# 회귀 분석시에는 표준화 X(거리를 가지고 계산하는 것이 아니므로) 원 데이터로 하고
+# 표준화 회귀계수를 구하면 데이터를 쓰기 어렵다...
+# 베타끼리의 상대적 크기 비교시 표준화를 할 수는 있다. 
+
+set.seed(seed = 1234)
+heights <- rnorm(n = 10000, mean = 172.4, sd = 5.7)
+scaled1 <-scale(x=heights)  
+# scale x=, 뒤 center에는 x의평균이 들어가고 scale에는 표준편차가 자동으로 들어간다
+# 즉, scale에는  x=벡터 , center = 분자에서 뺸 값, scale = 분모에 해당하는 값
+
+mean(x=scaled1)      
+sd(x=scaled1)
+range(scaled1)  # R에서 range는 ()안의 벡터의 최소/최대값을 벡터로 변환
+# 평균이 0이고, 표준편차가 1인 표준정규분포를 따르는 Z-score로 표준화 한것
+
+Min <- min(heights)
+Max <- max(heights)
+scaled2 <- scale(x=heights, center = Min, scale = Max - Min)
+mean(x = scaled2)
+sd(x=scaled2)
+range(scaled2)
+
+
+url <- 'https://bit.ly/white_wine_quality'
+guess_encoding(file=url)
+df <- read.csv(file=url, sep=';')
+str(object=df)
+
+head(x=df, n=10L)
+summary(object=df)
+
+tbl <- table(df$quality)
+print(x=tbl)
+
+tbl %>% 
+  prop.table() %>%
+  cumsum() %>% 
+  round(digits = 4L)*100
+
+bp <- barplot(height = tbl,
+              ylim = c(0,2400),
+              xlab = 'Quality Score',
+              main = 'White Wine Quality')
+# bp는 그래프 상의 위치 
+# print(x = bp)
+
+text(x = bp,
+     y = tbl,
+     labels = tbl,
+     pos = 3,
+     col = 'blue',
+     font = 2)
+
+df$grade <- ifelse(test = df$quality >= 7, yes = 'best', no = 'good')
+df$grade <- factor(x = df$grade, levels = c('good','best'))
+print(x= df$grade)
+df$quality <- NULL
+
+boxplot(formula = alcohol~grade, 
+        data = df, col='white')
+
+boxplot(formula = pH~grade, 
+        data = df, col='white')
+
+boxplot(formula = density ~ grade, 
+        data = df, col='white')
+
+
+n <- nrow(x = df)
+set.seed(seed=1234)
+index <- sample(x = n, size = n*0.7, replace = FALSE)
+trainSet <- df %>% slice(index)
+testSet <- df %>% slice(-index)
+
+trainSet$grade %>% table() %>% prop.table() %>% round(digits = 4L)*100
+testSet$grade %>% table() %>% prop.table() %>% round(digits = 4L)*100
+
+k <- trainSet %>% nrow() %>% sqrt() %>% ceiling()
+print(x=k)
+
+###install.packages("kknn")
+library(kknn)
+
+fit1 <- kknn(formula = grade~.,
+            train = trainSet,
+            test = testSet,
+            k = k,
+            kernel = 'rectangular')
+
+str(object = fit1)
+
+#head(x=fit1$CL,  n=10L)
+
+fit1$fitted.values  #good best로 된 추정 라벨
+fit1$prob[,2]  # best가 될 확률 (다수결로 계산한 값)
+
+
+real<-testSet$grade
+pred1<-fit1$fitted.values
+table(pred1, real) # 앞에 있는 것 세로 기준, 뒤에있는게 가로 기준 
+
+library(caret)
+confusionMatrix(data = pred1, reference = real, positive='best')
+
+#한 쪽으로 치우친 Data Set으로 분석을 하는 경우, 다수범주는 잘 맞추지만 소수 범주는 잘 못맞춘다.
+
+library(MLmetrics)
+F1_Score(y_true = real, y_pred = pred1, positive = 'best')
+
+prob1 <- fit1$prob[,2]
+
+library(pROC)
+roc(response = real, predictor = prob1) %>% 
+  plot(main = 'ROC curve', col = 'red', lty=1)
+
+auc(response = real, predictor = prob1)
+
+install.packages("DMwR")
+library(DMwR)
+
+set.seed(seed=1234)
+trainBal <- SMOTE(form = grade ~.,
+                  data = trainSet,
+                  perc.over = 200,
+                  k = 5,
+                  perc.under = 150)
+
+trainBal$grade  %>% table() %>% prop.table() %>% round(digits=4L)*100
+
+fit2 <- kknn(formula = grade ~., 
+             train = trainBal,
+             test = testSet,
+             k = k,
+             kernel = 'rectangular')
+pred2 <- fit2$fitted.values
+table(pred1, real)
+table(pred2, real)
+
+# 민감도가 굉장히 좋아진 결과를 얻음
+# Data Balancing의 좋은점 : 민감도는 높아지지만, 정확도는 떨어진다.
+
+confusionMatrix(data = pred1, reference = real, positive = 'best')
+confusionMatrix(data = pred2, reference = real, positive = 'best')
+
+F1_Score(y_true = real, y_pred = pred1, positive = 'best')
+F1_Score(y_true = real, y_pred = pred2, positive = 'best')
+
+prob2 <-fit2$prob[,2]
+roc(response = real, predictor = prob2 ) %>% 
+  plot(col = 'blue', lty = 1, add= TRUE)
+
+auc(response = real, predictor = prob2)
+auc(response = real, predictor = prob1)
+
+fit3 <- kknn(formula = grade ~.,
+             train = trainBal,
+             test = testSet,
+             k = k,
+             kernel = 'triangular')
+pred3 <- fit3$fitted.values
+table(pred3, real)
+table(pred2, real)
+
+confusionMatrix(data=pred3, reference = real, positive = 'best')
+confusionMatrix(data=pred2, reference = real, positive = 'best')
+
+F1_Score(y_true = real, y_pred = pred2, positive = 'best')
+F1_Score(y_true = real, y_pred = pred3, positive = 'best')
+
+# 가중치를 조정함으로써 
+
+prob3 <- fit3$prob[,2]
+roc(response = real, predictor = prob3) %>% 
+  plot(col='purple', lty=2, lwd = 2, add=TRUE)
+
+auc(response = real, predictor = prob3)
+auc(response = real, predictor = prob2)
+
+
+#KNN은 성능이 안좋지만, 가볍게 볼 수 있음
+#KNN은 거리를 기준으로 학습한다. 따라서 그 전에 데이터 표준화가 필요하다
+#데이터 표준화는 정규분포를 따르는 데이터에 대해서 평균 0, 표준편차(분산)가 1 인 표준정규분포를 따르도록 해준다. 
+# 기본값으로 쓰는 거리는 유클리안 거리
+#KKNN 은 훈련set을 놓고 시험셋 각각 1개마다 훈련셋과의 거리를 구해 가장 가까운 K개만큼의 가진 이웃을 뽑아내는 것
+#그리고 K의 이웃이 어떤 것인지 보고, 시험셋에 각각의 값을 추정하는 것이다. =>추정라벨, 추정확률을 얻을 수 있다.
+# 추정라벨 -> ConfusionMatrix/F1, 추정확률 -> ROC curve, AUC 를 구한다.
+# 그런데 가중치X, 밸런싱도 안된 데이터를 사용했었고, 목표번수가 8:2로 쏠렸으므로 SMOTE기법을 이용해서 
+# 목표변수를 5:5로 맞추는 밸런싱 실행을 해서 조금 나아지고 
+# 거리의 역순으로 가중치를 부여하니 더 나아졌다.
